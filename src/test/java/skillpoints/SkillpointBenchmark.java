@@ -82,7 +82,7 @@ public class SkillpointBenchmark {
         // Summary table
         System.out.println();
         System.out.println("══════════════════════════════════════════════════════════════════════════════════════");
-        System.out.println("  Summary (avg total across all cases)");
+        System.out.printf("  Summary (avg total across all cases, %d iterations, %d warmup)%n", ITERATIONS, WARMUP_ITERATIONS);
         System.out.println("══════════════════════════════════════════════════════════════════════════════════════");
         for (var algo : algos) {
             String name = algo.getName();

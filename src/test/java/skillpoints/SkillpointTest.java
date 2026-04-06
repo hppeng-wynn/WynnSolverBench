@@ -39,15 +39,13 @@ public class SkillpointTest {
 
         // Collect all algorithm names
         Map<String, long[]> summary = new LinkedHashMap<>();
-        passes.forEach((algo, cnt) -> summary.computeIfAbsent(algo, k -> new long[3])[0] = cnt.get());
-        failures.forEach((algo, cnt) -> summary.computeIfAbsent(algo, k -> new long[3])[1] = cnt.get());
-        totalTimeNs.forEach((algo, ns) -> summary.computeIfAbsent(algo, k -> new long[3])[2] = ns.get());
+        passes.forEach((algo, cnt) -> summary.computeIfAbsent(algo, k -> new long[2])[0] = cnt.get());
+        failures.forEach((algo, cnt) -> summary.computeIfAbsent(algo, k -> new long[2])[1] = cnt.get());
 
         for (var entry : summary.entrySet()) {
-            long p = entry.getValue()[0], f = entry.getValue()[1], ns = entry.getValue()[2];
-            System.out.printf("  %-25s  PASS: %3d   FAIL: %3d   TOTAL: %3d   TIME: %8.3f ms%n",
-                    entry.getKey(), p, f,
-                    p + f, ns / 1e6);
+            long p = entry.getValue()[0], f = entry.getValue()[1];
+            System.out.printf("  %-25s  PASS: %3d   FAIL: %3d   TOTAL: %3d%n",
+                    entry.getKey(), p, f, p + f);
         }
         System.out.println(
                 "══════════════════════════════════════════════════════════════════════════════════════\n");
