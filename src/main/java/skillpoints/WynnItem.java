@@ -21,6 +21,10 @@ public class WynnItem {
 		this.bonuses = bonuses;
 	}
 	
+	// For iteration
+	public int[] requirements() { return requirements; }
+	public int[] bonuses() { return bonuses; }
+	
 	public boolean canEquip(int[] currentSkillpoints) {
 		for (int i = 0; i < NUM_SKILLPOINTS; ++i) {
 			// NOTE: cannot be > 0. Thanks to crafted items

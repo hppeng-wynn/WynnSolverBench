@@ -1,5 +1,6 @@
 package skillpoints;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -129,7 +130,6 @@ public class SCCGraphAlgorithm extends SkillpointChecker {
 			List<GraphNode<WynnItem>> scc = sccs.get(i);
 			boolean[] sccNegatives = new boolean[items.size()];
 			boolean[] sccMembership = new boolean[items.size()];
-			itemCheck:
 			for (int j = 0; j < scc.size(); ++j) {
 				WynnItem item = scc.get(j).data;
 				int itemIndex = scc.get(j).nodeIndex;
@@ -137,7 +137,7 @@ public class SCCGraphAlgorithm extends SkillpointChecker {
 				for (int k = 0; k < WynnItem.NUM_SKILLPOINTS; ++k) {
 					if (item.bonuses[k] < 0) {
 						sccNegatives[itemIndex] = true;
-						continue itemCheck;
+						break;
 					}
 				}
 			}
@@ -153,27 +153,31 @@ public class SCCGraphAlgorithm extends SkillpointChecker {
 	}
 
 	// Generate all possible full-length "DFS walks" of a graph.
-	static class GraphPermutationGenerator<T> implements Iterable<List<GraphNode<T>>> {
-		private List<GraphNode<T>> nodes;
+	static class GraphPermutationGenerator<T> implements Iterable<GraphNode<T>[]> {
 		private GraphNode<T> root;
+		private int numNodes;
 
 		GraphPermutationGenerator(List<GraphNode<T>> graph) {
-			this.nodes = graph;
 			this.root = new GraphNode<T>(null);
-			this.root.children = nodes;
+			this.numNodes = graph.size();
+			this.root.children = graph;
 		}
 		@Override
-		public Iterator<List<GraphNode<T>>> iterator() { return new CustomIter(); }
-		private class CustomIter implements Iterator<List<GraphNode<T>>> {
-			boolean done = nodes.size() == 0;
-			private int[] pointers = new int[nodes.size()];
-			private ArrayList<GraphNode<T>> stack = new ArrayList<GraphNode<T>>();
+		public Iterator<GraphNode<T>[]> iterator() { return new CustomIter(); }
+		private class CustomIter implements Iterator<GraphNode<T>[]> {
+			boolean done = numNodes == 0;
+			private int[] pointers = new int[numNodes];
+			private GraphNode<T>[] stack;
+			private GraphNode<T>[] buffer;
 
 			CustomIter() {
-				GraphNode<T> n = root;
 				// Not your average for loop!
-				stack.add(n);
-				advanceHelper(n, 0);
+				stack = (GraphNode<T>[]) Array.newInstance(GraphNode.class, numNodes + 1);
+				stack[0] = root;
+				advanceHelper(0);
+
+				// Scary...
+				buffer = (GraphNode<T>[]) Array.newInstance(GraphNode.class, numNodes);
 			}
 			
 			@Override
@@ -181,10 +185,10 @@ public class SCCGraphAlgorithm extends SkillpointChecker {
 				return !done;
 			}
 			
-			public void advanceHelper(GraphNode<T> n, int i) {
-				n = stack.get(i);
+			public void advanceHelper(int i) {
+				GraphNode<T> n = stack[i];
 				addNodeLoop:
-				while (stack.size() <= nodes.size()) {
+				while (i < numNodes) {
 					for (int j = pointers[i]; j < n.children.size(); ++j) {
 						// visited check
 						if (n.children.get(j).visited) { continue; }
@@ -192,31 +196,29 @@ public class SCCGraphAlgorithm extends SkillpointChecker {
 						n = n.children.get(j);
 						n.visited = true;
 						i += 1;
-						stack.add(n);
+						stack[i] = n;
 						continue addNodeLoop;
 					}
 					// No children were valid. Backtrack
 					pointers[i] = 0;
 					n.visited = false;
-					stack.remove(stack.size() - 1);
 					i -= 1;
 					
 					if (i < 0) {
 						done = true;
 						return;
 					}
-
-					n = stack.get(i);
+					n = stack[i];
 				}
 			}
 
 			public void advance() {
-				int i = nodes.size() - 1;
-				GraphNode<T> n = stack.remove(stack.size() - 1);
+				GraphNode<T> n = stack[numNodes];
 				n.visited = false;
 				
 				// Optimize: Unrolled first iteration -- always happens
-				n = stack.remove(stack.size() - 1);
+				int i = numNodes - 1;
+				n = stack[i];
 				pointers[i] = 0;
 				n.visited = false;
 				i -= 1;
@@ -224,15 +226,12 @@ public class SCCGraphAlgorithm extends SkillpointChecker {
 					done = true;
 					return;
 				}
-				advanceHelper(n, i);
+				advanceHelper(i);
 			}
 
 			@Override
-			public List<GraphNode<T>> next() {
-				ArrayList<GraphNode<T>> buffer = new ArrayList<GraphNode<T>>();
-				for (int i = 1; i < stack.size(); ++i) {
-					buffer.add(stack.get(i));
-				}
+			public GraphNode<T>[] next() {
+				System.arraycopy(stack, 1, buffer, 0, buffer.length);
 				advance();
 				return buffer;
 			}
@@ -245,14 +244,18 @@ public class SCCGraphAlgorithm extends SkillpointChecker {
 		int[] skillpointReal;
 		int[] bestOrder;
 		boolean[] bestValid;
-		int evals = 0;
+		int evals;
 		List<WynnItem> items;
+		ItemSCCResult res;
 
-		OptimizationContext(int[] initialSkillpoints, List<WynnItem> items) {
-			this.skillpointReal = initialSkillpoints;
-			this.items = items;
+		void setup(int[] initialSkillpoints, List<WynnItem> items, ItemSCCResult res) {
 			this.bestViolations = items.size() + 1;
+			this.bestTotal = 0;
+			this.skillpointReal = initialSkillpoints;
 			this.bestValid = new boolean[items.size()];
+			this.evals = 0;
+			this.items = items;
+			this.res = res;
 		}
 	}
 
@@ -347,7 +350,7 @@ public class SCCGraphAlgorithm extends SkillpointChecker {
 					order, equipIndex + 1, ctx);
 		}
 
-		for (List<GraphNode<WynnItem>> perm : new GraphPermutationGenerator<WynnItem>(scc)) {
+		for (GraphNode<WynnItem>[] perm : new GraphPermutationGenerator<WynnItem>(scc)) {
 			int[] localRequired = skillpointRequired.clone();
 			int[] localApplied = skillpointApplied.clone();
 			int[] localMin = skillpointMin.clone();
@@ -370,6 +373,9 @@ public class SCCGraphAlgorithm extends SkillpointChecker {
 		return false;
 	}
 
+	
+	public OptimizationContext ctx = new OptimizationContext();
+
 	@Override
 	public boolean[] check(WynnItem[] items, int[] assignedSkillpoints) {
 		// TODO: Filter items
@@ -382,14 +388,13 @@ public class SCCGraphAlgorithm extends SkillpointChecker {
 		}
 		
 		ItemSCCResult res = constructSCCGraph(toCheck);
-		OptimizationContext ctx = new OptimizationContext(assignedSkillpoints, toCheck);
+		ctx.setup(assignedSkillpoints, toCheck, res);
 //		System.out.println("SCC stats:");
 //		for (List<GraphNode<WynnItem>> scc : res.sccs) {
 //			System.out.println(scc.size());
 //		}
 		permuteCheck(res, 1, new int[5], new int[5], new int[5], new int[toCheck.size()], 0, ctx);
 //		System.out.println(ctx.evals + " evals.");
-		System.out.println("SCC Graph construction took " + res.elapsedNS / 1000000.0 + " ms");
 		if (ctx.bestOrder == null) {
 			return new boolean[items.length];
 		}
