@@ -60,7 +60,7 @@ Returns a boolean array indicating which items can be equipped.
 
 ## Requirements
 
-- **Java 21** (Java 25 also available but Gradle needs 21)
+- **Java 21** (Gradle needs 21)
 
 ## Build & Run
 
